@@ -1,0 +1,239 @@
+# ============================================
+# NovaMind Testing Script
+# ============================================
+# This file contains test prompts to showcase 
+# every feature of the NovaMind CLI chatbot.
+#
+# HOW TO USE:
+# 1. Run: python main.py
+# 2. Copy and paste each prompt below one by one
+# 3. Observe the output for each feature
+#
+# ============================================
+
+# ============================================
+# SECTION 1: BASIC CONVERSATION
+# ============================================
+
+Hello! How are you today?
+
+Tell me something interesting about space.
+
+What's the weather like on Mars?
+
+Can you explain quantum computing in simple terms?
+
+
+# ============================================
+# SECTION 2: THEME SWITCHING (6 Themes)
+# ============================================
+
+/theme neon
+
+/theme hacker
+
+/theme zen
+
+/theme retro
+
+/theme ocean
+
+/theme sunset
+
+
+# ============================================
+# SECTION 3: AI PERSONALITY MODES (4 Modes)
+# ============================================
+
+/mode friendly
+
+What's the best way to learn programming?
+
+/mode creative
+
+Write me a short poem about coding.
+
+/mode serious
+
+Explain the importance of cybersecurity.
+
+/mode sarcastic
+
+Why do programmers prefer dark mode?
+
+
+# ============================================
+# SECTION 4: ALL COMMANDS
+# ============================================
+
+/help
+
+/about
+
+/stats
+
+/achievements
+
+/clear
+
+/name TestUser
+
+/bookmark
+
+/bookmarks
+
+/sound on
+
+/sound off
+
+/focus on
+
+/focus off
+
+/hint
+
+
+# ============================================
+# SECTION 5: MINI-GAMES
+# ============================================
+
+/play trivia
+
+/play fortune
+
+/play joke
+
+/play 8ball
+Will this chatbot win an award?
+
+
+# ============================================
+# SECTION 6: EASTER EGGS (Hidden Surprises)
+# ============================================
+
+42
+
+matrix
+
+hello world
+
+konami
+
+sudo
+
+uwu
+
+tell me a secret
+
+coffee
+
+i love you
+
+happy birthday
+
+flip table
+
+i'm bored
+
+never gonna give you up
+
+
+# ============================================
+# SECTION 7: MOOD DETECTION
+# (Try different emotional tones)
+# ============================================
+
+I'm so excited about this project!!!
+
+This is confusing, I don't understand...
+
+I'm feeling a bit sad today :(
+
+WOW THIS IS AMAZING!!! 🎉🎉🎉
+
+Hmm, I'm curious about something...
+
+Thanks so much for your help! ❤️
+
+Why is this so frustrating?!?!
+
+
+# ============================================
+# SECTION 8: MULTI-LINE & EDGE CASES
+# ============================================
+
+Hello
+This is a multi-line
+message to test input handling
+
+¿Cómo estás? 你好 مرحبا
+
+😀😎🚀💻🎮
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+askdjfhalskdjfhlaskdjfhlaskdjfhlaksjdhflaksjdhflakjsdhflaksjdhflaksjdhflaksjdfh
+
+
+# ============================================
+# SECTION 9: EXPORT CHAT
+# ============================================
+
+/export txt
+
+/export md
+
+/export json
+
+
+# ============================================
+# SECTION 10: SESSION END
+# ============================================
+
+/reset
+
+/exit
+
+
+# ============================================
+# QUICK DEMO SEQUENCE
+# ============================================
+# For a quick demonstration, use these in order:
+
+# 1. Hello! I'm testing NovaMind!
+# 2. /theme hacker
+# 3. Tell me a joke
+# 4. /mode sarcastic
+# 5. What's 2+2?
+# 6. 42
+# 7. /play fortune
+# 8. /stats
+# 9. /achievements
+# 10. /exit
+
+
+# ============================================
+# FEATURE CHECKLIST
+# ============================================
+# Use this checklist to verify all features:
+#
+# [ ] Welcome screen displays correctly
+# [ ] AI responds to messages
+# [ ] Typing animation works
+# [ ] All 6 themes switch properly
+# [ ] All 4 AI modes work
+# [ ] /help shows all commands
+# [ ] /stats shows session statistics
+# [ ] /achievements shows badges
+# [ ] /play trivia generates question
+# [ ] /play fortune shows fortune
+# [ ] /play joke tells a joke
+# [ ] /play 8ball works
+# [ ] Easter egg "42" triggers
+# [ ] Easter egg "matrix" shows animation
+# [ ] /name changes user name
+# [ ] /bookmark saves moment
+# [ ] /export creates files
+# [ ] Mood detection changes UI
+# [ ] /exit shows summary
+# [ ] Ctrl+C exits gracefully

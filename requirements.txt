@@ -1,0 +1,16 @@
+# NovaMind CLI AI Chatbot Dependencies
+# =====================================
+
+# Terminal UI & Styling
+rich>=13.0.0              # Rich text and beautiful formatting
+
+# AI Integration
+google-generativeai>=0.3.0  # Google Gemini AI
+
+# Sentiment Analysis
+textblob>=0.17.1          # Natural language processing
+
+# Utilities
+python-dotenv>=1.0.0      # Environment variable management
+emoji>=2.0.0              # Emoji support and handling
+pyfiglet>=0.8.post1       # ASCII art text generation
