@@ -133,139 +133,110 @@ class ThemeEngine:
         """
         return self.current_bg
     
-    def apply_full_background(self, r: int = None, g: int = None, b: int = None):
+    def paint_full_terminal_background(self, theme=None):
         """
-        ================================================================
-        CRITICAL: Fill the ENTIRE visible terminal with background color.
-        ================================================================
+        MANDATORY FIX STRATEGY:
+        1. Clear scrollback (ESC[3J)
+        2. Clear screen (ESC[2J)
+        3. Move cursor home (ESC[H)
+        4. Paint ENTIRE viewport
+        5. Reset cursor
         
-        This is the CORE function that fixes the partial background issue.
-        It implements true TUI-style full-screen painting.
-        
-        MUST BE CALLED:
-        1. On application startup (before welcome screen)
-        2. After ANY theme change
-        3. After ANY cls/clear command
-        4. After terminal resize (if detected)
-        
-        ALGORITHM:
-        1. Get terminal dimensions: width (columns) × height (rows)
-        2. Build ANSI background escape sequence: \033[48;2;R;G;Bm
-        3. Clear screen with \033[2J
-        4. Move cursor to home with \033[H
-        5. FILL EVERY CELL: Print 'height' lines of 'width' spaces
-        6. Move cursor back to home position
-        7. Set background code for subsequent output
-        
-        WHY THIS WORKS:
-        ANSI background codes only color PRINTED characters.
-        Empty/unprinted cells use terminal default background.
-        By printing a space in EVERY cell, we color EVERY cell.
+        This makes the application behave like a real TUI (htop, neovim).
         
         Args:
-            r: Red component (0-255), or None to use current_bg
-            g: Green component (0-255), or None to use current_bg  
-            b: Blue component (0-255), or None to use current_bg
+            theme: Optional theme object with .bg_rgb attribute. 
+                   If None, uses self.current_bg.
         """
         if not self.supports_color:
             return
+
+        # Determine RGB
+        r, g, b = None, None, None
+        if theme and hasattr(theme, 'bg_rgb'):
+             r, g, b = theme.bg_rgb
+        elif self.current_bg:
+             r, g, b = self.current_bg
         
-        # ============================================
-        # STEP 1: Determine RGB values to use
-        # ============================================
-        if r is not None and g is not None and b is not None:
-            # New color provided - save to state
-            self.current_bg = (r, g, b)
-        elif self.current_bg is not None:
-            # Use existing saved color
-            r, g, b = self.current_bg
-        else:
-            # No color specified and no saved color - nothing to do
-            return
+        if r is None:
+            return  # No color to paint
+
+        # Save to state if it's new
+        self.current_bg = (r, g, b)
         
-        # ============================================
-        # STEP 2: Build ANSI escape sequence
-        # Format: ESC[48;2;R;G;Bm (24-bit TrueColor background)
-        # 48 = background, 2 = RGB mode, R;G;B = color values
-        # ============================================
+        # Build ANSI Background Code
         bg_code = f"\033[48;2;{r};{g};{b}m"
         
-        # ============================================
-        # STEP 3: Get terminal dimensions
-        # This tells us how many cells we need to fill
-        # ============================================
+        # Get dimensions
         try:
             term_size = shutil.get_terminal_size()
-            width = term_size.columns   # Number of columns (horizontal cells)
-            height = term_size.lines    # Number of rows (vertical lines)
+            width = term_size.columns
+            height = term_size.lines
         except Exception:
-            # Fallback dimensions if terminal size detection fails
             width = 120
             height = 30
+            
+        # ============================================
+        # MANDATORY STEP 1: FULL BUFFER RESET
+        # 1. Clear scrollback (ESC[3J)
+        # 2. Clear screen (ESC[2J)
+        # 3. Move cursor home (ESC[H)
+        # ============================================
+        sys.stdout.write(bg_code)
+        sys.stdout.write("\033[3J")  # Clear scrollback buffer
+        sys.stdout.write("\033[2J")  # Clear visible viewport
+        sys.stdout.write("\033[H")   # Move cursor to top-left
         
         # ============================================
-        # STEP 4: Apply background and clear screen
-        # Write bg code BEFORE clear so clear inherits the color
+        # MANDATORY STEP 2: TRUE FULL VIEWPORT PAINT
+        # Fill strictly (rows) lines with (columns) spaces
         # ============================================
-        sys.stdout.write(bg_code)              # Set background color
-        sys.stdout.write("\033[2J")            # Clear entire screen
-        sys.stdout.write("\033[H")             # Move cursor to home (1,1)
-        
-        # ============================================
-        # STEP 5: FILL THE ENTIRE SCREEN
-        # This is the CRITICAL fix - we print a space in EVERY cell
-        # Each line is 'width' spaces with the background code
-        # We print 'height' such lines to cover the viewport
-        # ============================================
-        blank_line = " " * width  # Line of spaces (will have bg color)
+        blank_line = " " * width
         
         for row in range(height):
-            # Write background code + blank line
-            # The background code ensures this line is colored
-            # We use \r\n for proper line handling on Windows
+            # Write background code explicit on every line
             sys.stdout.write(f"{bg_code}{blank_line}")
+            
+            # Use \r\n to ensure we start at column 0 of next line
+            # But for the last line, we prevent auto-scroll if possible
             if row < height - 1:
                 sys.stdout.write("\n")
-        
+                
         # ============================================
-        # STEP 6: Move cursor back to top-left
-        # After filling, cursor is at bottom - move it home
+        # MANDATORY STEP 4: CURSOR POSITION CONTROL
+        # Move cursor back to safe UI start row (0,0) / Home
         # ============================================
         sys.stdout.write("\033[H")
         
         # ============================================
-        # STEP 7: Ensure background persists for future output
-        # Write the bg code one more time so subsequent prints inherit it
+        # MANDATORY STEP 3: FORCE BACKGROUND ON EVERY PRINT
+        # Set background attribute strictly for future output
         # ============================================
         sys.stdout.write(bg_code)
-        
-        # Flush all output to terminal
         sys.stdout.flush()
-    
-    def apply_background(self, r: int, g: int, b: int):
+
+    def apply_full_background(self, r: int = None, g: int = None, b: int = None):
         """
         Apply RGB background color to terminal - FULL SCREEN FILL.
-        
-        This is the main entry point for changing background color.
-        It now delegates to apply_full_background() for complete coverage.
-        
-        Args:
-            r: Red component (0-255)
-            g: Green component (0-255)
-            b: Blue component (0-255)
+        DEPRECATED: Use paint_full_terminal_background(theme) where possible.
+        Kept for compatibility with existing calls.
         """
-        # Delegate to full background fill for complete coverage
+        # Create a temporary dummy object if needed or just update state 
+        # so paint_full_terminal_background picks it up
+        if r is not None and g is not None and b is not None:
+            self.current_bg = (r, g, b)
+            
+        self.paint_full_terminal_background()
+
+    def apply_background(self, r: int, g: int, b: int):
+        """
+        Apply RGB background color to terminal.
+        """
         self.apply_full_background(r, g, b)
-    
+
     def repaint_background(self):
         """
         Re-apply the current background without full screen fill.
-        
-        Use this for quick refreshes after Rich library operations
-        that might reset the ANSI state. This only writes the ANSI code,
-        it doesn't repaint all cells.
-        
-        For full repaint after clear, use apply_full_background() instead.
         """
         if not self.supports_color or self.current_bg is None:
             return
@@ -274,101 +245,64 @@ class ThemeEngine:
         bg_sequence = f"\033[48;2;{r};{g};{b}m"
         sys.stdout.write(bg_sequence)
         sys.stdout.flush()
-    
+
     def ensure_background(self):
         """
         Ensure background color is active for subsequent output.
-        
-        Call this after:
-        - Rich library console.print() operations
-        - Any external library that might reset terminal state
-        - Before critical output sections
-        
-        This writes the ANSI code but doesn't repaint cells.
-        For full repaint, use apply_full_background().
         """
         if not self.supports_color or self.current_bg is None:
             return
         
         r, g, b = self.current_bg
+        # FORCE background ANSI
         sys.stdout.write(f"\033[48;2;{r};{g};{b}m")
         sys.stdout.flush()
-    
+
     def get_bg_ansi_code(self) -> str:
         """
         Get the ANSI escape sequence for current background.
-        
-        Use this to prefix output lines to ensure they have the correct
-        background color, especially when using print() instead of console.
-        
-        Returns:
-            ANSI escape sequence string, or empty string if no theme set
         """
         if self.current_bg is None:
             return ""
         r, g, b = self.current_bg
         return f"\033[48;2;{r};{g};{b}m"
-    
+
     def clear_screen_safe(self):
         """
         SAFE screen clear that preserves theme with FULL REPAINT.
-        
-        This is the ONLY way to clear the screen in NovaMind.
-        It performs a complete full-screen background fill after clearing.
-        
-        IMPORTANT: This now calls apply_full_background() to ensure
-        the entire terminal viewport is painted with the theme color.
+        MUST Clear scrollback too.
         """
         if not self.supports_color:
-            # Fallback for non-color terminals
             os.system('cls' if os.name == 'nt' else 'clear')
             return
         
         if self.current_bg is not None:
-            # Full repaint with current background color
-            self.apply_full_background()
+            self.paint_full_terminal_background()
         else:
-            # No theme set - standard clear
-            sys.stdout.write("\033[2J\033[H")
+            sys.stdout.write("\033[3J\033[2J\033[H")
             sys.stdout.flush()
-    
+
     def reset_background(self):
         """
         Reset terminal to default colors.
-        
-        Call this on application exit to restore user's terminal.
         """
         if not self.supports_color:
             return
         
-        # \033[0m = reset all attributes (colors, styles)
         sys.stdout.write("\033[0m")
-        
-        # Clear screen to remove any lingering background
-        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.write("\033[3J\033[2J\033[H") # Clear scrollback + screen
         sys.stdout.flush()
-        
-        # Clear our state
         self.current_bg = None
-    
+
     def flash_background(self, r: int, g: int, b: int, duration: float = 0.1):
         """
-        Briefly flash background color (for alerts/effects).
-        
-        Args:
-            r, g, b: Flash color RGB
-            duration: How long to show flash (seconds)
+        Briefly flash background (uses partial repaint for speed if needed, 
+        but user requires full fill).
         """
         import time
-        
-        # Save current background
         saved_bg = self.current_bg
-        
-        # Flash with full background fill
         self.apply_full_background(r, g, b)
         time.sleep(duration)
-        
-        # Restore original (if any) with full background fill
         if saved_bg:
             self.apply_full_background(*saved_bg)
         else:

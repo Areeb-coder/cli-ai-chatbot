@@ -16,6 +16,7 @@ from rich.table import Table
 from rich.columns import Columns
 from rich.align import Align
 from rich.box import ROUNDED, DOUBLE, HEAVY, SIMPLE
+from rich.style import Style
 
 from .styles import get_style_manager
 from .logos import get_logo, get_colored_logo, get_compact_logo
@@ -83,53 +84,66 @@ class UI:
         The caller is responsible for clearing via theme_engine.clear_screen_safe()
         to ensure theme background is preserved.
         """
-        # REMOVED: self.console.clear() - causes theme background loss
-        # Caller handles clearing through theme_engine for proper persistence
         theme = self.style_manager.theme
         current_theme_name = self.style_manager.current_theme_name
         
-        # Get theme-specific logo - each theme has a unique logo!
+        # FIX: Construct a style that includes the theme background
+        # This prevents Rich from resetting lines to default (black) background
+        # and creates a seamless "transparent" look
+        r, g, b = theme.bg_rgb
+        bg_rgb_str = f"rgb({r},{g},{b})"
+        
+        # Create styles that combine foreground colors with the theme background
+        base_style = Style(color=theme.primary, bgcolor=bg_rgb_str)
+        
+        # Get theme-specific logo
         if self.term_width >= 75:
-            # Full logo for wide terminals
             logo = get_logo(current_theme_name)
         else:
-            # Compact logo for narrow terminals
             logo = get_compact_logo(current_theme_name)
         
-        # Display theme-specific logo with theme colors
-        logo_text = Text(logo, style=theme.primary)
-        self.console.print(Align.center(logo_text))
+        # Display theme-specific logo with background-aware style
+        # We apply style to Align to ensure padding spaces also use the background
+        logo_text = Text(logo, style=base_style)
+        self.console.print(Align.center(logo_text, style=base_style))
         
         # Tagline
         tagline = random.choice(TAGLINES)
-        self.console.print(Align.center(Text(tagline, style=theme.secondary)))
-        self.console.print()
+        tagline_style = Style(color=theme.secondary, bgcolor=bg_rgb_str)
+        self.console.print(Align.center(Text(tagline, style=tagline_style), style=tagline_style))
+        self.console.print(Text(" ", style=base_style))
         
         # Time-based greeting
         greeting = self._get_time_greeting()
-        self.console.print(Align.center(Text(greeting, style=theme.ai_text)))
-        self.console.print()
+        greeting_style = Style(color=theme.ai_text, bgcolor=bg_rgb_str)
+        self.console.print(Align.center(Text(greeting, style=greeting_style), style=greeting_style))
+        self.console.print(Text(" ", style=base_style))
         
         # Tip
         tip = random.choice(TIPS)
+        # Use simple panel style string for background
+        panel_bg_style = f"on {bg_rgb_str}"
         tip_panel = Panel(
             Text(tip, style=theme.muted),
             border_style=theme.border,
             box=ROUNDED,
             width=min(60, self.term_width - 4),
             title="💡 Tip",
-            title_align="left"
+            title_align="left",
+            style=panel_bg_style # Applies background to panel
         )
-        self.console.print(Align.center(tip_panel))
-        self.console.print()
+        self.console.print(Align.center(tip_panel, style=base_style))
+        self.console.print(Text(" ", style=base_style))
         
         # Separator
+        sep_style = Style(color=theme.muted, bgcolor=bg_rgb_str)
         self.console.print(
             Align.center(
-                Text("─" * min(50, self.term_width - 10), style=theme.muted)
+                Text("─" * min(50, self.term_width - 10), style=sep_style),
+                style=sep_style
             )
         )
-        self.console.print()
+        self.console.print(Text(" ", style=base_style))
     
     def _get_time_greeting(self) -> str:
         """Get greeting based on current time"""
