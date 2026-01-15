@@ -16,6 +16,7 @@ from rich.text import Text
 from rich.panel import Panel
 
 from .styles import get_style_manager
+from .sounds import get_sound_simulator
 
 
 class Animator:
@@ -137,9 +138,9 @@ class Animator:
                 time.sleep(delay)
     
     def _typing_sound(self, char: str):
-        """Generate text-based typing sound indicator"""
-        # This creates a subtle visual "sound" effect
-        pass  # Sound is handled in the display
+        """Generate typing sound effect"""
+        if self.sound_enabled:
+            get_sound_simulator().play_keystroke_sound()
     
     # ============================================
     # THINKING ANIMATION

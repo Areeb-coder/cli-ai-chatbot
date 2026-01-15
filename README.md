@@ -32,7 +32,7 @@
 ## ✨ Features
 
 ### 🎨 Dynamic Theme System
-Switch between 6 beautiful visual themes on-the-fly.
+Switch between 11 beautiful visual themes on-the-fly, each with a unique ASCII logo.
 
 ### 💬 Mood-Reactive Interface  
 The UI adapts colors and typing speed based on your emotional tone.
@@ -485,14 +485,21 @@ Now messages show:
 
 ## 🎨 Themes
 
+## 🎨 Themes
+
 | Command | Theme | Description |
 |---------|-------|-------------|
+| `/theme dark` | 🌑 Dark | Professional dark gray & white (Default) |
+| `/theme light` | ☀️ Light | Clean, minimal white mode |
 | `/theme neon` | 🌆 Neon | Cyberpunk magenta & cyan glow |
 | `/theme hacker` | 🖥️ Hacker | Matrix-style green on black |
-| `/theme zen` | 🧘 Zen | Calm, soft pastels |
+| `/theme zen` | 🧘 Zen | Calm, balanced cyan & white |
 | `/theme retro` | 📺 Retro | Amber CRT nostalgia |
 | `/theme ocean` | 🌊 Ocean | Deep blue waves |
 | `/theme sunset` | 🌅 Sunset | Warm orange gradients |
+| `/theme midnight` | 🌙 Midnight | Deep blue starry night |
+| `/theme calm` | ☁️ Calm | Soft slate & cloudy gray |
+| `/theme warning` | ⚠️ Warning | High contrast red alert |
 
 ---
 
@@ -600,7 +607,8 @@ CLI Basesd AI chatbot/
     ├── ai_engine.py     # Gemini AI integration
     ├── animator.py      # Typing & effects
     ├── ui.py            # Terminal UI panels
-    ├── styles.py        # 6 theme system
+    ├── logos.py         # ASCII art logos
+    ├── styles.py        # 11 theme system
     ├── memory.py        # Session management
     ├── commands.py      # 18 commands
     ├── mood.py          # Sentiment detection

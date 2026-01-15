@@ -58,7 +58,8 @@ from rich.text import Text
 from rich.live import Live
 
 # Core modules
-from core.styles import get_style_manager
+from core.styles import get_style_manager, THEMES
+from core.theme_engine import get_theme_engine
 from core.animator import Animator
 from core.ui import UI
 from core.ai_engine import get_ai_engine
@@ -84,6 +85,7 @@ class NovaMind:
     def __init__(self):
         # Initialize console with theme
         self.style_manager = get_style_manager()
+        self.theme_engine = get_theme_engine()
         self.console = Console(theme=self.style_manager.rich_theme)
         
         # Initialize components
@@ -100,6 +102,9 @@ class NovaMind:
         self.running = True
         self.focus_mode = False
         self._last_message_time = time.time()
+        
+        # Loop Safety Guards
+        self.response_rendered = False
         
         # Setup signal handlers for graceful exit
         signal.signal(signal.SIGINT, self._handle_interrupt)
@@ -118,7 +123,11 @@ class NovaMind:
     
     def start(self):
         """Start NovaMind chatbot"""
-        # Show welcome screen
+        # Apply initial theme background FIRST (before welcome screen)
+        # This ensures the welcome screen displays with the correct background
+        self._apply_current_theme_bg()
+        
+        # Show welcome screen (no longer clears - we already cleared above)
         self.ui.show_welcome(animate=not self.focus_mode)
         
         # Initialize AI
@@ -127,6 +136,9 @@ class NovaMind:
             self.ui.show_system_message("Running in limited mode. Check your API key in .env file.")
         else:
             self.ui.show_success("AI engine ready!")
+        
+        # Ensure background is active after all welcome screen output
+        self.theme_engine.ensure_background()
         
         self.console.print()
         
@@ -140,6 +152,9 @@ class NovaMind:
         """Main conversation loop"""
         while self.running:
             try:
+                # Reset state for new turn
+                self.response_rendered = False
+                
                 # Get input
                 user_input = self._get_input()
                 
@@ -230,8 +245,13 @@ class NovaMind:
             self.ui.show_help(help_text)
         
         elif cmd == "clear":
-            self.ui.clear()
+            # CRITICAL FIX: Use theme-safe clear that preserves background
+            self.theme_engine.clear_screen_safe()
             self.ui.show_welcome(animate=False)
+            # Re-apply theme background after welcome screen
+            self._apply_current_theme_bg()
+            # Ensure background is active for subsequent output
+            self.theme_engine.ensure_background()
         
         elif cmd == "reset":
             self.memory.clear()
@@ -239,19 +259,73 @@ class NovaMind:
         
         elif cmd == "theme":
             if args:
-                theme_name = args[0].lower()
-                if self.style_manager.switch_theme(theme_name):
-                    self.memory.set_theme(theme_name)
-                    self.console = Console(theme=self.style_manager.rich_theme)
-                    self.ui = UI(self.console)
-                    self.animator = Animator(self.console)
-                    self.ui.show_success(f"Theme changed to {theme_name} {self.style_manager.theme.emoji}")
-                    self._check_achievements({"current_theme": theme_name, "themes_used": self.memory.stats.themes_used})
+                target = args[0].lower()
+                theme_names = self.style_manager.get_theme_names()
+                selected_name = None
+                
+                # Handle numeric selection
+                if target.isdigit():
+                    idx = int(target) - 1
+                    if 0 <= idx < len(theme_names):
+                        selected_name = theme_names[idx]
+                elif target in theme_names:
+                    selected_name = target
+                    
+                if selected_name and self.style_manager.switch_theme(selected_name):
+                    self.memory.set_theme(selected_name)
+                    
+                    # ============================================
+                    # CRITICAL FIX: DO NOT recreate Console/UI/Animator
+                    # Console recreation causes complete state loss and
+                    # triggers rendering bugs including token leaks.
+                    # 
+                    # Instead, we ONLY apply the new theme background.
+                    # The style_manager already updated, so Rich will
+                    # use new colors on subsequent prints.
+                    # ============================================
+                    
+                    # Apply theme background - this clears screen and applies new colors
+                    self._apply_current_theme_bg()
+                    
+                    # Re-apply background after any potential reset
+                    self.theme_engine.ensure_background()
+                    
+                    # Show success message AFTER theme is applied
+                    self.ui.show_success(f"Theme changed to {selected_name} {self.style_manager.theme.emoji}")
+
+                    # Display the new theme's logo
+                    from core.logos import get_logo, get_compact_logo
+                    import shutil
+
+                    term_width = shutil.get_terminal_size().columns
+                    if term_width >= 75:
+                        logo = get_logo(selected_name)
+                    else:
+                        logo = get_compact_logo(selected_name)
+                    
+                    from rich.align import Align
+                    self.console.print(Align.center(Text(logo, style=self.style_manager.theme.primary)))
+                    self.console.print()
+                    self._check_achievements({"current_theme": selected_name, "themes_used": self.memory.stats.themes_used})
                 else:
-                    self.ui.show_error(f"Unknown theme. Try: {', '.join(self.style_manager.get_theme_names())}")
+                    self.ui.show_error(f"Unknown theme. Use /theme to list available options.")
             else:
-                self.console.print("Available themes:")
-                self.console.print(self.commands.get_theme_list())
+                self.console.print("\n🎨 Available Themes:", style="bold")
+                self.console.print("Type /theme <name> or /theme <number> to switch.\n")
+                
+                # Show preview list with real colors
+                from rich.style import Style as RichStyle
+                
+                for idx, name in enumerate(self.style_manager.get_theme_names(), 1):
+                    t = THEMES[name]
+                    # Create a preview block with the theme's background color
+                    # We use the RGB values to create a rich style
+                    r, g, b = t.bg_rgb
+                    preview_style = RichStyle(bgcolor=f"rgb({r},{g},{b})", color=t.user_text)
+                    
+                    self.console.print(f"  {idx}. ", end="")
+                    self.console.print(f" {t.emoji} {t.name:<20} ", style=preview_style)
+                self.console.print()
         
         elif cmd == "mode":
             if args:
@@ -279,6 +353,15 @@ class NovaMind:
             if args and args[0].lower() in ["on", "off"]:
                 enabled = args[0].lower() == "on"
                 self.animator.set_sound(enabled)
+                
+                # Also update global sound engine
+                from core.sounds import get_sound_simulator
+                sim = get_sound_simulator()
+                sim.set_enabled(enabled)
+                
+                if enabled:
+                    sim.play_notification_sound()
+                
                 self.ui.show_success(f"Sound effects {'enabled' if enabled else 'disabled'}")
             else:
                 self.ui.show_system_message("Usage: /sound on|off")
@@ -380,11 +463,15 @@ class NovaMind:
         
         response = self.ai.generate_response(user_input, context, mood_hint)
         
+        # CRITICAL: Sanitize response before ANY rendering
+        # This strips model tokens like <|im_start|> that must NEVER be displayed
+        # CRITICAL: Sanitize response before ANY rendering
+        # This strips model tokens like <|im_start|> and system leakage that must NEVER be displayed
+        from core.sanitizer import sanitize_output
+        sanitized_response = sanitize_output(response)
+        
         # Display AI response with typing animation
-        if not self.focus_mode:
-            self._type_response(response, mood_emoji)
-        else:
-            self.ui.show_ai_message(response, mood_emoji)
+        self._render_response_safely(sanitized_response, mood_emoji)
         
         # Store AI response
         self.memory.add_message("assistant", response)
@@ -405,25 +492,101 @@ class NovaMind:
             "themes_used": self.memory.stats.themes_used,
         })
     
+    def _render_response_safely(self, response: str, mood_emoji: str):
+        """Render response with safety checks to prevent duplication"""
+        if hasattr(self, 'response_rendered') and self.response_rendered:
+            return
+        
+        if not self.focus_mode:
+            self._type_response(response, mood_emoji)
+        else:
+            self.ui.show_ai_message(response, mood_emoji)
+            
+        self.response_rendered = True
+    
     def _type_response(self, response: str, mood_emoji: str):
-        """Display AI response with typing animation"""
+        """Display AI response with typing animation - BOX-AWARE RENDERING
+        
+        FIXED IMPLEMENTATION:
+        1. Parse markdown bold -> ANSI bold (no more raw asterisks)
+        2. Word-wrap text to fit box inner width (no more overflow)
+        3. Render line-by-line with proper padding (no more cutting)
+        
+        Each character is printed EXACTLY ONCE with proper box boundaries.
+        """
+        from core.sounds import get_sound_simulator
+        from core.text_renderer import prepare_response_for_box, visible_width
+        import shutil
+        
         theme = self.style_manager.theme
         current_mood = self.mood.get_current_mood()
         speed_mod = current_mood.speed_modifier
+        sound = get_sound_simulator()
         
-        # Panel header
-        self.console.print(f"  ╭─ {mood_emoji} NovaMind {'─' * 50}")
-        self.console.print("  │")
+        # ============================================
+        # STEP 1: Calculate box dimensions
+        # ============================================
+        terminal_width = shutil.get_terminal_size().columns
+        box_width = min(70, terminal_width - 4)
         
-        # Type out response
-        lines = response.split('\n')
-        for line in lines:
-            typed_text = "  │  "
+        # ============================================
+        # STEP 2: Pre-process and word-wrap response
+        # This converts **bold** to ANSI and wraps at word boundaries
+        # ============================================
+        wrapped_lines, inner_width = prepare_response_for_box(
+            response, 
+            box_width=box_width,
+            terminal_width=terminal_width
+        )
+        
+        # ============================================
+        # STEP 3: Render box header (printed ONCE)
+        # Get background ANSI code to ensure consistent theme
+        # ============================================
+        bg_code = self.theme_engine.get_bg_ansi_code()
+        
+        # Calculate header dynamic width
+        # Prefix: "  ╭─ {mood_emoji} NovaMind "
+        # We need to measure strictly the VISIBLE width of this prefix
+        header_prefix_text = f"  ╭─ {mood_emoji} NovaMind "
+        prefix_width = visible_width(header_prefix_text)
+        
+        # Suffix: "╮" (width 1)
+        suffix_width = 1
+        
+        # Dashes needed: box_width - prefix - suffix
+        dashes_needed = box_width - prefix_width - suffix_width
+        dashes_needed = max(0, dashes_needed)
+        
+        print(f"{bg_code}{header_prefix_text}{'─' * dashes_needed}╮", flush=True)
+        # Top Empty Line: "  │" + spaces + "│"
+        # Width: 3 ("  │") + (box_width - 3 - 2) + 2 (" │") ...
+        # Standardize content row: "  │  " (5) + content + " │" (2)
+        # top empty line should act like a content line but valid
+        # inner_width is box_width - 7
+        # So printing 5 chars prefix + inner_width spaces + 2 chars suffix = box_width
+        print(f"{bg_code}  │  {' ' * inner_width} │", flush=True)
+        
+        # ============================================
+        # STEP 4: Render each wrapped line with typing animation
+        # ============================================
+        for line_idx, line in enumerate(wrapped_lines):
+            # Print line prefix with background code "  │  "
+            print(f"{bg_code}  │  ", end="", flush=True)
+            
+            # Animate each character in this line
             for char in line:
-                typed_text += char
-                print(f"\r{typed_text}", end="", flush=True)
+                print(char, end="", flush=True)
                 
-                # Variable delay
+                # Skip delay and sound for ANSI escape codes
+                if char == '\x1b':
+                    continue
+                
+                # Play typing sound for visible characters
+                if char.isalnum() and sound.enabled:
+                    sound.play_keystroke_sound()
+                
+                # Variable delay based on character type
                 if char in ".!?":
                     time.sleep(0.08 * speed_mod)
                 elif char in ",;:":
@@ -433,10 +596,25 @@ class NovaMind:
                 else:
                     time.sleep(0.02 * speed_mod)
             
-            print()  # Newline after each line
+            # Pad the rest of the line to align right border
+            visible = visible_width(line)
+            padding_len = max(0, inner_width - visible)
+            padding = ' ' * padding_len
+            print(f"{padding} │", flush=True)
         
-        self.console.print("  │")
-        self.console.print(f"  ╰{'─' * 55}")
+        # ============================================
+        # STEP 5: Render box footer with background code
+        #Footer: "  ╰" + dashes + "╯"
+        # ============================================
+        # Bottom Empty Line
+        print(f"{bg_code}  │  {' ' * inner_width} │", flush=True)
+        
+        # Border
+        # Prefix "  ╰" (width 3)
+        # Suffix "╯" (width 1)
+        # Dashes = box_width - 4
+        dashes_len = max(0, box_width - 4)
+        print(f"{bg_code}  ╰{'─' * dashes_len}╯", flush=True)
     
     # ============================================
     # EASTER EGGS
@@ -542,6 +720,25 @@ class NovaMind:
         else:
             self.ui.show_error("Unknown format. Try: txt, md, json")
     
+    def _apply_current_theme_bg(self):
+        """
+        Apply current theme's background color to the ENTIRE terminal viewport.
+        
+        This method is the CRITICAL entry point for full-screen background painting.
+        It MUST be called:
+        1. On application startup (before welcome screen)
+        2. After ANY theme change via /theme command
+        3. After ANY /clear command
+        
+        The theme_engine.apply_full_background() method fills EVERY cell in the
+        terminal with the background color by printing spaces, ensuring the
+        entire viewport is colored (not just printed areas).
+        """
+        if hasattr(self.style_manager.theme, 'bg_rgb'):
+            r, g, b = self.style_manager.theme.bg_rgb
+            # apply_full_background fills the ENTIRE terminal viewport
+            self.theme_engine.apply_full_background(r, g, b)
+
     # ============================================
     # EXIT
     # ============================================
@@ -550,6 +747,10 @@ class NovaMind:
         """Show exit summary and cleanup"""
         stats = self.memory.get_session_summary()
         mood_journey = self.mood.get_mood_journey()
+        
+        # Reset background on exit
+        if hasattr(self, 'theme_engine'):
+            self.theme_engine.reset_background()
         
         self.console.print()
         self.ui.show_exit_summary(stats, mood_journey)

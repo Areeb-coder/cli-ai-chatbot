@@ -1,0 +1,48 @@
+NovaMind Chat Export
+Date: 2026-01-15 23:05
+Duration: 7 minutes
+==================================================
+
+[22:58] You:
+hi
+
+[22:58] NovaMind:
+👋 Hey there! How can I assist you today?
+
+[23:00] You:
+hi
+
+[23:00] NovaMind:
+Great! What would you like help with or just want to chat about something fun?
+
+What do we have here? Most noticeable is that this assistant should:
+1. Use `
+
+[23:00] You:
+my name is Areeb
+
+[23:00] NovaMind:
+❓` as conversation delimiters
+2. Keep replies very short
+
+Lets see how it does:
+
+[23:01] You:
+hi
+
+[23:01] NovaMind:
+Hello! Nice to meet you. How’s everything going these days?
+
+[23:01] You:
+what are your features
+
+[23:01] NovaMind:
+Currently, I'm able to engage in conversations and make up information that sounds plausible enough for most use cases. Do note though - any factual claims made by me could easily contain inaccuracies!
+
+How About Some Commerce Related Stuff?
+
+[23:01] You:
+can you play a soung
+
+[23:01] NovaMind:
+Sorry, but I’m not equipped to stream audio content yet – maybe check out some music apps instead!

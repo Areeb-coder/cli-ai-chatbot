@@ -18,6 +18,7 @@ from rich.align import Align
 from rich.box import ROUNDED, DOUBLE, HEAVY, SIMPLE
 
 from .styles import get_style_manager
+from .logos import get_logo, get_colored_logo, get_compact_logo
 
 
 # ASCII Art Logo
@@ -76,17 +77,26 @@ class UI:
     # ============================================
     
     def show_welcome(self, animate: bool = True):
-        """Display animated welcome screen"""
-        self.console.clear()
+        """Display animated welcome screen
+        
+        NOTE: This method no longer clears the screen.
+        The caller is responsible for clearing via theme_engine.clear_screen_safe()
+        to ensure theme background is preserved.
+        """
+        # REMOVED: self.console.clear() - causes theme background loss
+        # Caller handles clearing through theme_engine for proper persistence
         theme = self.style_manager.theme
+        current_theme_name = self.style_manager.current_theme_name
         
-        # Choose logo based on terminal width
+        # Get theme-specific logo - each theme has a unique logo!
         if self.term_width >= 75:
-            logo = LOGO
+            # Full logo for wide terminals
+            logo = get_logo(current_theme_name)
         else:
-            logo = LOGO_SMALL
+            # Compact logo for narrow terminals
+            logo = get_compact_logo(current_theme_name)
         
-        # Display logo
+        # Display theme-specific logo with theme colors
         logo_text = Text(logo, style=theme.primary)
         self.console.print(Align.center(logo_text))
         
@@ -390,8 +400,10 @@ Made with ❤️ for the terminal lovers.
     # ============================================
     
     def clear(self):
-        """Clear the terminal"""
-        self.console.clear()
+        """Clear the terminal while preserving theme"""
+        # CRITICAL: Use theme engine's safe clear to preserve background color
+        from .theme_engine import get_theme_engine
+        get_theme_engine().clear_screen_safe()
     
     def set_focus_mode(self, enabled: bool):
         """Set focus mode"""

@@ -10,6 +10,7 @@ import time
 import requests
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+from core.sanitizer import sanitize_output
 
 
 @dataclass
@@ -95,6 +96,7 @@ class AIEngine:
             
             self.api_keys = keys
             self.initialized = True
+            print(f"  [AI] AI Engine initialized with {len(keys)} API keys.")
             return True
             
         except Exception as e:
@@ -111,6 +113,7 @@ class AIEngine:
         """Switch to next available API key"""
         if len(self.api_keys) > 1:
             self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+            print(f"  [AI] Switching to API Key #{self.current_key_index + 1}...")
             return True
         return False
     
@@ -142,7 +145,7 @@ class AIEngine:
             "frequency_penalty": 1.2,  # Strongly penalize repeated tokens
             "presence_penalty": 1.0,   # Strongly encourage new topics
             "repetition_penalty": 1.2,  # Additional repetition penalty (if model supports it)
-            "stop": ["User:", "Human:", "\n\n\n"],  # Stop sequences
+            "stop": ["User:", "Human:", "\n\n\n", "</s>", "[/INST]"],  # Stop sequences
         }
         
         response = requests.post(
@@ -215,6 +218,21 @@ class AIEngine:
         # try to extract just the first occurrence
         words = text.split()
         if len(words) > 20:
+            # Check for 2 repetitions (Halves) - Common case for double-posting
+            half = len(words) // 2
+            # Compare first half vs second half
+            # we compare the normalized strings
+            part1 = ' '.join(words[:half]).lower()
+            # matches the length of part1 to avoid issues with odd number of words
+            part2 = ' '.join(words[half:half+half]).lower()
+            
+            # Check for match - either exact or significantly matching prefix
+            if len(part1) > 30:
+                # Exact match or very strong prefix match (first 100 chars)
+                if part1 == part2 or (len(part1) > 100 and part1[:100] == part2[:100]):
+                    text = ' '.join(words[:half])
+                    return text.strip()
+            
             # Check if the first third roughly equals the second third
             third = len(words) // 3
             first_third = ' '.join(words[:third]).lower()
@@ -237,21 +255,18 @@ class AIEngine:
         self, 
         user_message: str, 
         context: List[Dict] = None,
-        mood_hint: str = None
+        mood_hint: str = None,
+        attempt_count: int = 0
     ) -> str:
         """
         Generate AI response to user message.
-        
-        Args:
-            user_message: The user's input message
-            context: Previous conversation context
-            mood_hint: Detected mood to help tone adjustment
-        
-        Returns:
-            AI response string
         """
         if not self.initialized:
             return "⚠️ AI is not initialized. Please check your API key configuration."
+        
+        # Prevent infinite loops
+        if attempt_count > len(self.api_keys):
+            return "😓 All API keys are currently overloaded (Rate Limit). Please try again later."
         
         try:
             # Build the system prompt
@@ -298,13 +313,14 @@ class AIEngine:
                 error_lower = error_msg.lower()
                 if error_code == 429 or "rate limit" in error_lower or "quota exceeded" in error_lower:
                     if self._switch_to_next_key():
-                        return self.generate_response(user_message, context, mood_hint)
+                         # Pass incremented attempt_count
+                        return self.generate_response(user_message, context, mood_hint, attempt_count + 1)
                     return "😅 Rate limit reached. Please try again in a moment!"
                 
                 # Check for invalid/unauthorized key
                 if error_code == 401 or "unauthorized" in error_lower or "invalid api key" in error_lower:
                     if self._switch_to_next_key():
-                        return self.generate_response(user_message, context, mood_hint)
+                        return self.generate_response(user_message, context, mood_hint, attempt_count + 1)
                     return f"⚠️ API key issue: {error_msg[:150]}"
                 
                 # Check for model not found
@@ -317,8 +333,14 @@ class AIEngine:
             # Extract response text
             if "choices" in response_data and len(response_data["choices"]) > 0:
                 raw_response = response_data["choices"][0]["message"]["content"].strip()
-                # Remove any repetitive content
-                return self._remove_repetition(raw_response)
+                
+                # STRICT SANITIZATION PIPELINE
+                # 1. Sanitize (remove scaffolding, system prompts, leakages)
+                from core.sanitizer import sanitize_output
+                clean_response = sanitize_output(raw_response)
+                
+                # 2. Remove Repetition (handle loops)
+                return self._remove_repetition(clean_response)
             
             return "😓 No response received from AI."
             
@@ -410,7 +432,10 @@ class AIEngine:
             response_data = self._make_api_request(messages)
             
             if "choices" in response_data and len(response_data["choices"]) > 0:
-                return response_data["choices"][0]["message"]["content"].strip()
+                raw_response = response_data["choices"][0]["message"]["content"].strip()
+                # Strict sanitization
+                from core.sanitizer import sanitize_output
+                return sanitize_output(raw_response)
             return "No response"
         except Exception as e:
             return f"Error: {str(e)[:50]}"

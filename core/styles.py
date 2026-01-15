@@ -8,7 +8,7 @@ Handles colors, gradients, and styling tokens.
 from rich.style import Style
 from rich.theme import Theme
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import random
 
 
@@ -27,6 +27,7 @@ class ThemeColors:
     highlight: str        # Highlighted text
     muted: str            # Subtle text
     emoji: str            # Theme emoji
+    bg_rgb: Tuple[int, int, int] = (0, 0, 0)  # RGB Background color
 
 
 # ============================================
@@ -34,6 +35,36 @@ class ThemeColors:
 # ============================================
 
 THEMES: Dict[str, ThemeColors] = {
+    "dark": ThemeColors(
+        name="Dark Mode",
+        primary="white",
+        secondary="#b3b3b3",
+        user_text="white",
+        ai_text="#d9d9d9",
+        system_text="#808080",
+        error_text="red",
+        border="#4d4d4d",
+        background="black",
+        highlight="white",
+        muted="#4d4d4d",
+        emoji="🌑",
+        bg_rgb=(10, 10, 10)
+    ),
+    "light": ThemeColors(
+        name="Light Mode",
+        primary="black",
+        secondary="blue",
+        user_text="black",
+        ai_text="blue",
+        system_text="#808080",
+        error_text="red",
+        border="#b3b3b3",
+        background="white",
+        highlight="black",
+        muted="#999999",
+        emoji="☀️",
+        bg_rgb=(250, 250, 250)
+    ),
     "neon": ThemeColors(
         name="Neon Cyberpunk",
         primary="bright_magenta",
@@ -45,8 +76,9 @@ THEMES: Dict[str, ThemeColors] = {
         border="magenta",
         background="black",
         highlight="bright_yellow",
-        muted="grey70",
-        emoji="🌆"
+        muted="#b3b3b3",
+        emoji="🌆",
+        bg_rgb=(15, 5, 20)
     ),
     "hacker": ThemeColors(
         name="Hacker Matrix",
@@ -60,7 +92,8 @@ THEMES: Dict[str, ThemeColors] = {
         background="black",
         highlight="bright_white",
         muted="green4",
-        emoji="🖥️"
+        emoji="🖥️",
+        bg_rgb=(0, 15, 0)
     ),
     "zen": ThemeColors(
         name="Zen Garden",
@@ -73,8 +106,9 @@ THEMES: Dict[str, ThemeColors] = {
         border="cyan3",
         background="black",
         highlight="bright_white",
-        muted="grey70",
-        emoji="🧘"
+        muted="#b3b3b3",
+        emoji="🧘",
+        bg_rgb=(20, 25, 30)
     ),
     "retro": ThemeColors(
         name="Retro Amber",
@@ -88,7 +122,8 @@ THEMES: Dict[str, ThemeColors] = {
         background="black",
         highlight="bright_white",
         muted="yellow4",
-        emoji="📺"
+        emoji="📺",
+        bg_rgb=(30, 20, 5)
     ),
     "ocean": ThemeColors(
         name="Deep Ocean",
@@ -102,7 +137,8 @@ THEMES: Dict[str, ThemeColors] = {
         background="black",
         highlight="bright_white",
         muted="cyan3",
-        emoji="🌊"
+        emoji="🌊",
+        bg_rgb=(5, 15, 30)
     ),
     "sunset": ThemeColors(
         name="Warm Sunset",
@@ -116,7 +152,53 @@ THEMES: Dict[str, ThemeColors] = {
         background="black",
         highlight="bright_white",
         muted="yellow4",
-        emoji="🌅"
+        emoji="🌅",
+        bg_rgb=(40, 10, 10)
+    ),
+    "midnight": ThemeColors(
+        name="Midnight Blue",
+        primary="blue",
+        secondary="bright_blue",
+        user_text="white",
+        ai_text="bright_blue",
+        system_text="#808080",
+        error_text="red",
+        border="blue",
+        background="black",
+        highlight="white",
+        muted="#4d4d4d",
+        emoji="🌙",
+        bg_rgb=(5, 5, 25)
+    ),
+    "calm": ThemeColors(
+        name="Calm Slate",
+        primary="white",
+        secondary="cyan",
+        user_text="white",
+        ai_text="cyan",
+        system_text="#999999",
+        error_text="red",
+        border="#808080",
+        background="black",
+        highlight="white",
+        muted="#666666",
+        emoji="☁️",
+        bg_rgb=(40, 45, 50)
+    ),
+    "warning": ThemeColors(
+        name="Red Alert",
+        primary="bright_red",
+        secondary="red",
+        user_text="bright_white",
+        ai_text="bright_red",
+        system_text="red",
+        error_text="bright_yellow",
+        border="bright_red",
+        background="red",
+        highlight="bright_yellow",
+        muted="red",
+        emoji="⚠️",
+        bg_rgb=(50, 0, 0)
     ),
 }
 
@@ -127,9 +209,9 @@ class StyleManager:
     Supports dynamic theme switching and mood-reactive colors.
     """
     
-    def __init__(self, theme_name: str = "neon"):
+    def __init__(self, theme_name: str = "dark"):
         self.current_theme_name = theme_name
-        self.theme = THEMES.get(theme_name, THEMES["neon"])
+        self.theme = THEMES.get(theme_name, THEMES["dark"])
         self._build_rich_theme()
     
     def _build_rich_theme(self):
